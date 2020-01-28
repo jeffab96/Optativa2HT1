@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">PROYECTO_2H_G04</string>
+    <string name="default_notification_channel_id" translatable="false">default_channel</string>
+</resources>
