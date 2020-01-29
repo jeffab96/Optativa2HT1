@@ -1,10 +1,16 @@
 package com.example.H2_OPTATIVA_T1;
 
+import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.graphics.Color;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -51,6 +57,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     File file;
     EditText texto;
 
+    private SensorManager sensorManager;
+    private SensorEventListener lightEventListener;
+    private View root;
+    private float maxValue;
+    private Sensor lightSensor;
+
     static List<Usuario> usuarioList;
 
     //Se encarga de crear el archivo y la carpeta al iniciar la aplicación en caso que no existan
@@ -70,6 +82,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         usuarioList = listarUsuarios();
         //Escribe en el archivo con la matriz de datos local
         escribirFile();
+
+        root = findViewById(R.id.root);
+        sensorManager = (SensorManager) getSystemService(Service.SENSOR_SERVICE);
+        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
+
+        if (lightSensor == null) {
+            Toast.makeText(this, "El dispositivo no tiene sensor", Toast.LENGTH_SHORT).show();
+            finish();
+        }
+
+        maxValue = lightSensor.getMaximumRange();
+
+        lightEventListener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                float value = event.values[0];
+                getSupportActionBar().setTitle("Luz:" + value + "lx");
+                int newValue = (int)(255f + value / maxValue);
+                root.setBackgroundColor(Color.rgb(newValue, newValue, newValue));
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+            }
+        };
     }
 
     public void segundoPlano(final String usu, final String tipo) {
@@ -314,5 +352,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Toast.makeText(this, "No se encontraron registros", Toast.LENGTH_SHORT).show();
         }
         return lista;
+    }
+    @Override
+    protected void onPause(){
+        super.onPause();
+        sensorManager.unregisterListener(lightEventListener);
+    }
+    @Override
+    protected void onResume(){
+        super.onResume();
+        sensorManager.registerListener(lightEventListener, lightSensor, SensorManager.SENSOR_DELAY_FASTEST);
+
     }
 }
