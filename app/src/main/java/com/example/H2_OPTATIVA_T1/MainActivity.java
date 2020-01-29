@@ -1,23 +1,20 @@
 package com.example.H2_OPTATIVA_T1;
 
-import android.app.Service;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.graphics.Color;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.StrictMode;
+import android.speech.RecognizerIntent;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -57,13 +54,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     File file;
     EditText texto;
 
-    private SensorManager sensorManager;
-    private SensorEventListener lightEventListener;
-    private View root;
-    private float maxValue;
-    private Sensor lightSensor;
+    Spinner integrantes;
+    String grabar = null;
 
     static List<Usuario> usuarioList;
+    private static final int RECOGNIZE_SPEECH_ACTIVITY = 1;
 
     //Se encarga de crear el archivo y la carpeta al iniciar la aplicación en caso que no existan
     @Override
@@ -83,31 +78,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         //Escribe en el archivo con la matriz de datos local
         escribirFile();
 
-        root = findViewById(R.id.root);
-        sensorManager = (SensorManager) getSystemService(Service.SENSOR_SERVICE);
-        lightSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT);
-
-        if (lightSensor == null) {
-            Toast.makeText(this, "El dispositivo no tiene sensor", Toast.LENGTH_SHORT).show();
-            finish();
-        }
-
-        maxValue = lightSensor.getMaximumRange();
-
-        lightEventListener = new SensorEventListener() {
-            @Override
-            public void onSensorChanged(SensorEvent event) {
-                float value = event.values[0];
-                getSupportActionBar().setTitle("Luz:" + value + "lx");
-                int newValue = (int)(255f + value / maxValue);
-                root.setBackgroundColor(Color.rgb(newValue, newValue, newValue));
-            }
-
-            @Override
-            public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-            }
-        };
     }
 
     public void segundoPlano(final String usu, final String tipo) {
@@ -281,7 +251,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         ConexionSQLHelper admin = new ConexionSQLHelper(this, "bd_usuarios", null, 1);
         SQLiteDatabase BaseDeDatabase = admin.getWritableDatabase();
         Cursor listaLogs = BaseDeDatabase.rawQuery("Select * from logs", null);
-        int i=0;
+        int i = 0;
         if (listaLogs.moveToFirst()) {
             do {
                 i++;
@@ -293,7 +263,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         } else {
             Toast.makeText(this, "No se encontraron registros LOGS", Toast.LENGTH_SHORT).show();
         }
-        Toast.makeText(this, "Se han añadido "+i+" registros LOGS", Toast.LENGTH_LONG).show();
+        Toast.makeText(this, "Se han añadido " + i + " registros LOGS", Toast.LENGTH_LONG).show();
         String delete = "DELETE FROM logs";
         BaseDeDatabase.execSQL(delete);
     }
@@ -323,8 +293,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String usuario = et.getText().toString();
         EditText et_pass = findViewById(R.id.txt_entrada_password);
         String pass = et_pass.getText().toString();
+
+        boolean voice = validarClave();
+
         boolean flag = buscarUsuario(usuario, pass);
-        if (flag) {
+        if (flag && voice) {
             Intent validacionLogin = new Intent(this, Listar.class);
             startActivity(validacionLogin);
             guardarPreferencias();
@@ -335,6 +308,66 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Toast.makeText(this, "Credenciales incorrectas", Toast.LENGTH_SHORT).show();
         }
     }
+
+    private boolean validarClave() {
+        String claveJeff = "Hola optativa";
+        String claveCarlos = "Hola mundo";
+        String claveTania = "Bienvenido optativa";
+        String clave;
+
+        boolean flag = false;
+
+        integrantes = (Spinner) findViewById(R.id.cmb_integrante);
+        String integrante = integrantes.getSelectedItem().toString();
+
+        if (integrante.equalsIgnoreCase(claveJeff)) {
+            clave = claveJeff;
+        } else if (integrante.equalsIgnoreCase(claveCarlos)) {
+            clave = claveCarlos;
+        } else {
+            clave = claveTania;
+        }
+
+        if (clave.equalsIgnoreCase(grabar) && grabar != null) {
+            flag = true;
+        }
+        return flag;
+    }
+
+    public void reconocimientoVoz(View v) {
+        Intent intentActionRecognizeSpeech = new Intent(
+                RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        // Configura el Lenguaje (Español-México)
+        intentActionRecognizeSpeech.putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL, "es-MX");
+        try {
+            startActivityForResult(intentActionRecognizeSpeech,
+                    RECOGNIZE_SPEECH_ACTIVITY);
+        } catch (ActivityNotFoundException a) {
+            Toast.makeText(getApplicationContext(),
+                    "Tú dispositivo no soporta el reconocimiento por voz",
+                    Toast.LENGTH_SHORT).show();
+        }
+
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        switch (requestCode) {
+            case RECOGNIZE_SPEECH_ACTIVITY:
+                if (resultCode == RESULT_OK && null != data) {
+                    ArrayList<String> speech = data
+                            .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                    String strSpeech2Text = speech.get(0);
+                    grabar = strSpeech2Text;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
 
     public List<Usuario> listarUsuarios() {
         List<Usuario> lista = new ArrayList<>();
@@ -352,16 +385,5 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             Toast.makeText(this, "No se encontraron registros", Toast.LENGTH_SHORT).show();
         }
         return lista;
-    }
-    @Override
-    protected void onPause(){
-        super.onPause();
-        sensorManager.unregisterListener(lightEventListener);
-    }
-    @Override
-    protected void onResume(){
-        super.onResume();
-        sensorManager.registerListener(lightEventListener, lightSensor, SensorManager.SENSOR_DELAY_FASTEST);
-
     }
 }
